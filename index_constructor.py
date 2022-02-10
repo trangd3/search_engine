@@ -1,4 +1,3 @@
-from enum import unique
 from pymongo import MongoClient, InsertOne
 from pymongo.errors import BulkWriteError
 import json
