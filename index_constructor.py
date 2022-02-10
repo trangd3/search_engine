@@ -1,4 +1,6 @@
-from pymongo import MongoClient
+from enum import unique
+from pymongo import MongoClient, InsertOne
+from pymongo.errors import BulkWriteError
 import json
 # import lxml
 # import math
@@ -11,17 +13,8 @@ from nltk.corpus import stopwords, wordnet
 from nltk.stem import WordNetLemmatizer
 # from nltk.tokenize import RegexpTokenizer
 
-
-# import firebase_admin
-# from firebase_admin import credentials
-# from firebase_admin import firestore
-# Use a service account
-# cred = credentials.Certificate('serviceAccountKey.json')
-# firebase_admin.initialize_app(cred)
-# db = firestore.client()
-# batch = db.batch()
-
-
+client = MongoClient(port=27017)
+db = client.search_engine
 
 CORPUS_PATH = "../WEBPAGES_RAW"
 STOPWORDS = set(stopwords.words('english'))
@@ -33,14 +26,13 @@ tm['R'] = wordnet.ADV
 
 def index_constructor():
     unique_words = defaultdict(lambda: defaultdict(float))
-
-    bk = json.load(open(f"{CORPUS_PATH}/bookkeeping.json"))
     
+    bk = json.load(open(f"{CORPUS_PATH}/bookkeeping.json"))
     for index, (id, url) in enumerate(bk.items()):
-        # print(id)
-        # # testing cases
-        # if index == 50:
-        #     break;
+        print(id)
+        # testing cases
+        if index == 500:
+            break;
         with open(f"{CORPUS_PATH}/{id}", "r", encoding="utf-8") as file:
             text = file.read()
 
@@ -58,19 +50,14 @@ def index_constructor():
                         lemma = lemmatizer.lemmatize(token, tm[tag[0]])
                         if len(lemma) >= 3:
                             unique_words[lemma][id] = index
-    
-    # adding to database
-    # print("finished parsing")
-    # for index, word in enumerate(unique_words):
-    #     word_ref = db.collection("ex").document(word)
-    #     batch.set(word_ref, {"id": unique_words[word]}, merge=True)
 
-    #     # commits are limited to 500 operations
-    #     if index > 0 and index % 9 == 0:
-    #         print("committing")
-    #         batch.commit()
-    # print("final commit")
-    # batch.commit()
+    
+    print("finished parsing")
+    try:
+        # ! https://pymongo.readthedocs.io/en/stable/examples/bulk.html
+        db.example.bulk_write([InsertOne({"_id": word, "urls": unique_words[word]}) for word in unique_words])
+    except BulkWriteError as bwe:
+        print(bwe.details)
                               
     return 0
 
