@@ -1,3 +1,5 @@
+from asyncio import proactor_events
+from concurrent.futures import process
 from pymongo import MongoClient, InsertOne
 from pymongo.errors import BulkWriteError
 import json
@@ -22,26 +24,26 @@ tm['J'] = wordnet.ADJ
 tm['V'] = wordnet.VERB
 tm['R'] = wordnet.ADV
 
+tf = defaultdict(lambda: defaultdict(int))          # {docId: {lemma: term_count}}
+df = defaultdict(int)                                 # {word: document_count}
+words = defaultdict(dict)
 
 def index_constructor():
-    num_docs = 0
-    tf = defaultdict(lambda: defaultdict(int))          # {docId: {lemma: term_count}}
-    df = defaultdict(int)                               # {word: document_count}
-    tf_idf = defaultdict(lambda: defaultdict(float))    # {word: {docId: score}}
-    # docs = defaultdict(lambda: defaultdict(list))
+    # {word: {docId: {"tf-idf": score, "in_metadata": boolean, "is_bolded": boolean, 
+    #                 "in_title": boolean, "is_h1": boolean, "is_h2": boolean, "is_h3": boolean}}}
 
-    '''
-    word: {word: {docId: : score}}
-    docs: {docId: {"metadata": [], "title": [], "bold": [], h1: [], h2: [], h3: []}}
-    '''
+
+    # tf = defaultdict(dict)                              # {docId: {lemma: {score & booleans}}}
+    # tf_idf = defaultdict(lambda: defaultdict(float))    # {word: {docId: score}}
+    num_docs = 0
 
     bk = json.load(open(f"{CORPUS_PATH}/bookkeeping.json"))
     for index, (id, url) in enumerate(bk.items()):
-
+        
         # testing cases
         print(id)
-        if index > 498:
-            break;
+        # if index > 498:
+        #     break;
 
         with open(f"{CORPUS_PATH}/{id}", "r", encoding="utf-8") as file:
             content = file.read()
@@ -63,6 +65,16 @@ def index_constructor():
                         # lemmatize according to the token's first tag
                         lemma = lemmatizer.lemmatize(token, tm[tag[0]])
 
+                        # initializing fields for lemma in words dict
+                        if lemma not in tf[id]:
+                            words[lemma][id] = dict()
+                            words[lemma][id]["metadata"] = False
+                            words[lemma][id]["title"] = False
+                            words[lemma][id]["bolded"] = False
+                            words[lemma][id]["h1"] = False
+                            words[lemma][id]["h2"] = False
+                            words[lemma][id]["h3"] = False
+
                         # finding term frequency for each doc (how many times it appears in this document)
                         tf[id][lemma] += 1
 
@@ -74,24 +86,57 @@ def index_constructor():
                 # for calculating df (total number of valid documents)
                 num_docs += 1
 
+
+                # metadata
+                metadata = soup.find("meta", attrs={"name":"description"})
+                if metadata:
+                    try:
+                        metadata = metadata["content"]
+                        process_text(metadata, "metadata")
+                    except KeyError:
+                        pass
+
+                # title
+                if soup.title:
+                    title = soup.title.get_text().encode("ascii", "replace").decode().lower()
+                    process_text(title, "title")
+
+                # bold
+                bolded = soup.find("b")
+                if bolded:
+                    bolded = bolded.get_text().encode("ascii", "replace").decode().lower()
+                    process_text(bolded, "bolded")
+
+                # h1
+                h1 = soup.find("h1")
+                if h1:
+                    h1 = h1.get_text().encode("ascii", "replace").decode().lower()
+                    process_text(h1, "h1")
+
+                # h2
+                h2 = soup.find("h2")
+                if h2:
+                    h2 = h2.get_text().encode("ascii", "replace").decode().lower()
+                    process_text(h2, "h2")
+
+                # h3
+                h3 = soup.find("h3")
+                if h3:
+                    h3 = h3.get_text().encode("ascii", "replace").decode().lower()
+                    process_text(h3, "h3")
+
                 
-                # if (soup.title is not None):
-                #     title = soup.title.get_text().encode("ascii", "replace").decode().lower()
-                #     tokens = word_tokenize(title)
-                #     lst = []
-                #     for token in tokens:
-                #         lemma = lemmatizer.lemmatize(token)
-                #         lst.append(lemma)
     
     print("finished parsing")
 
     for id in tf:
         for lemma in tf[id]:
-            tf_idf[lemma][id] = (1+math.log(tf[id][lemma],10)) * math.log(num_docs/df[lemma])
+            words[lemma][id]["tfidf"] = (1 + math.log(tf[id][lemma], 10)) * math.log(num_docs/df[lemma])
+
     
     try:
         # ! https://pymongo.readthedocs.io/en/stable/examples/bulk.html
-        db.test.bulk_write([InsertOne({"_id": term, "urls": tf_idf[term]}) for term in tf_idf])
+        db.test.bulk_write([InsertOne({"_id": term, "docId": words[term]}) for term in words])
         # db.example.bulk_write([InsertOne({"_id": word, "urls": unique_words[word]}) for word in unique_words])
     except BulkWriteError as bwe:
         print(bwe.details)
@@ -100,4 +145,12 @@ def index_constructor():
 
     return 0
 
-index_constructor()
+def process_text(text, tag):
+    lemmatizer = WordNetLemmatizer()
+    tokens = word_tokenize(text)
+    for token in tokens:
+        if (len(token) >= 3 and token not in STOPWORDS and token.isalnum()) or token.isdigit():
+            lemma = lemmatizer.lemmatize(token)
+
+            if lemma in tf[id]:
+                words[lemma][id][tag] = True
