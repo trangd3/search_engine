@@ -19,9 +19,6 @@ class SearchEngine:
         # don't lemmatize for now
 
         # calculations for query
-        for word in query:
-            self.words[word] = self.collection.find_one(word)
-
         query_frequencies = defaultdict(int)
         query_tfidf = defaultdict(float)
         query_norms = []
@@ -30,11 +27,8 @@ class SearchEngine:
             query_frequencies[word] += 1
 
         for word in query:
-            if self.words[word]:
-                query_tfidf[word] = (
-                    1 + math.log(query_frequencies[word], 10)) * self.words[word]["idf"]
-            else:
-                query_tfidf[word] = 0
+            query_tfidf[word] = (
+                1 + math.log(query_frequencies[word], 10)) * self.words[word]["idf"]
 
         sum = 0
         for word in query:
@@ -54,23 +48,21 @@ class SearchEngine:
         doc_scores = defaultdict(float)
 
         for word in query:
-            # if word in self.words:
-            if self.words[word]:
-                for docId in self.words[word]["docId"]:
-                    documents.add(docId)
+            for docId in self.words[word]["docId"]:
+                documents.add(docId)
 
         for doc in documents:
             doc_norms = []
             sum = 0
             for word in query:
-                if self.words[word] and self.words[word]["docId"][doc]:
+                if self.words[word]["docId"][doc]:
                     sum += math.pow(self.words[word]["docId"][doc]["tfidf"], 2)
 
             doc_length = math.sqrt(sum)
 
             for word in query:
                 # print(x["docId"][doc]["tfidf"], doc_length )
-                if self.words[word] and self.words[word]["docId"][doc]:
+                if self.words[word]["docId"][doc]:
                     multiplier = 1
                     if self.words[word]["docId"][doc]["title"]:
                         multiplier += 0.3
@@ -110,10 +102,18 @@ class SearchEngine:
                 break
 
             query = list(set(search.split()))
-            query_norms = self.calculate_query_norm(query)
+            modified_query = []
+            for word in query:
+                self.words[word] = self.collection.find_one(word)
+                # only check for words that return something from the database
+                if self.words[word]:
+                    modified_query.append(word)
+
+            query_norms = self.calculate_query_norm(modified_query)
 
             if len(query_norms) != 0:
-                doc_scores = self.calculate_doc_scores(query, query_norms)
+                doc_scores = self.calculate_doc_scores(
+                    modified_query, query_norms)
                 top_20 = sorted(doc_scores.items(), key=lambda kv: -kv[1])[:20]
                 self.print_results(top_20)
             else:
