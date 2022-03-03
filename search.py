@@ -1,8 +1,8 @@
+import json
 import math
 import numpy as np
 from collections import defaultdict
 from pymongo import MongoClient
-import json
 
 CORPUS_PATH = "../WEBPAGES_RAW"
 
@@ -117,4 +117,4 @@ class SearchEngine:
                 top_20 = sorted(doc_scores.items(), key=lambda kv: -kv[1])[:20]
                 self.print_results(top_20)
             else:
-                print("Results not found")
+                print("Results not found\n")

@@ -1,5 +1,3 @@
-from asyncio import proactor_events
-from concurrent.futures import process
 from pymongo import MongoClient, InsertOne
 from pymongo.errors import BulkWriteError
 import json
@@ -24,18 +22,21 @@ tm['J'] = wordnet.ADJ
 tm['V'] = wordnet.VERB
 tm['R'] = wordnet.ADV
 
-tf = defaultdict(lambda: defaultdict(int))          # {docId: {term: term_count}}
+# {docId: {term: term_count}}
+tf = defaultdict(lambda: defaultdict(int))
 df = defaultdict(int)                               # {term: document_count}
 idfs = defaultdict(float)                           # {term: idf}
-words = defaultdict(dict)                           # {term: {docId: {"tfidf": float, "metadata": bool, "bolded": bool,
-                                                    #                 "title": bool, "h1": bool, "h2": bool, "h3": bool}}
+# {term: {docId: {"tfidf": float, "metadata": bool, "bolded": bool,
+words = defaultdict(dict)
+#                 "title": bool, "h1": bool, "h2": bool, "h3": bool}}
+
 
 def index_constructor():
     num_docs = 0
 
     bk = json.load(open(f"{CORPUS_PATH}/bookkeeping.json"))
     for index, (id, url) in enumerate(bk.items()):
-        
+
         # testing cases
         print(id)
         # if index > 498:
@@ -82,9 +83,8 @@ def index_constructor():
                 # for calculating df (total number of valid documents)
                 num_docs += 1
 
-
                 # metadata
-                metadata = soup.find("meta", attrs={"name":"description"})
+                metadata = soup.find("meta", attrs={"name": "description"})
                 if metadata:
                     try:
                         metadata = metadata["content"]
@@ -157,23 +157,22 @@ def index_constructor():
                             if term in tf[id]:
                                 words[term][id]["h3"] = True
 
-                
-    
     print("finished parsing")
 
     for id in tf:
         for term in tf[id]:
             idfs[term] = math.log(num_docs/df[term], 10)
-            words[term][id]["tfidf"] = (1 + math.log(tf[id][term], 10)) * idfs[term]
+            words[term][id]["tfidf"] = (
+                1 + math.log(tf[id][term], 10)) * idfs[term]
 
-    
     try:
         # ! https://pymongo.readthedocs.io/en/stable/examples/bulk.html
-        db.words.bulk_write([InsertOne({"_id": term, "idf": idfs[term], "docId": words[term]}) for term in words])
+        db.words.bulk_write([InsertOne(
+            {"_id": term, "idf": idfs[term], "docId": words[term]}) for term in words])
         # db.example.bulk_write([InsertOne({"_id": term, "urls": unique_words[term]}) for term in unique_words])
     except BulkWriteError as bwe:
         print(bwe.details)
-    
+
     print("finished writing")
 
     return 0
@@ -187,5 +186,6 @@ def index_constructor():
 
 #             if term in tf[id]:
 #                 words[term][id][tag] = True
+
 
 index_constructor()

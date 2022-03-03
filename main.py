@@ -1,9 +1,4 @@
 # nltk.download()
-import math
-import numpy as np
-from collections import defaultdict
-from pymongo import MongoClient
-import json
 from search import SearchEngine
 
 CORPUS_PATH = "../WEBPAGES_RAW"
