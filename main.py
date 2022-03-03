@@ -1,10 +1,6 @@
 # nltk.download()
 from pymongo import MongoClient
 
-'''
-{informatics: {score: 234}}
-'''
-
 if __name__ == "__main__":
     search = input("Search: ").lower()
     client = MongoClient(port=27017)
@@ -16,10 +12,3 @@ if __name__ == "__main__":
 
     for k, v in sorted(x["docId"].items(), key = lambda p: -p[1]["tfidf"]):
         print(k, v)
-    
-
-    '''
-    school of ics
-
-    tfidf: 
-    '''

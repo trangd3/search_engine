@@ -24,17 +24,13 @@ tm['J'] = wordnet.ADJ
 tm['V'] = wordnet.VERB
 tm['R'] = wordnet.ADV
 
-tf = defaultdict(lambda: defaultdict(int))          # {docId: {lemma: term_count}}
-df = defaultdict(int)                                 # {word: document_count}
-words = defaultdict(dict)
+tf = defaultdict(lambda: defaultdict(int))          # {docId: {term: term_count}}
+df = defaultdict(int)                               # {term: document_count}
+idfs = defaultdict(float)                           # {term: idf}
+words = defaultdict(dict)                           # {term: {docId: {"tfidf": float, "metadata": bool, "bolded": bool,
+                                                    #                 "title": bool, "h1": bool, "h2": bool, "h3": bool}}
 
 def index_constructor():
-    # {word: {docId: {"tf-idf": score, "in_metadata": boolean, "is_bolded": boolean, 
-    #                 "in_title": boolean, "is_h1": boolean, "is_h2": boolean, "is_h3": boolean}}}
-
-
-    # tf = defaultdict(dict)                              # {docId: {lemma: {score & booleans}}}
-    # tf_idf = defaultdict(lambda: defaultdict(float))    # {word: {docId: score}}
     num_docs = 0
 
     bk = json.load(open(f"{CORPUS_PATH}/bookkeeping.json"))
@@ -63,25 +59,25 @@ def index_constructor():
                     # * if token is at least 3 characters long, not a stop word, and is alphanumeric
                     if (len(token) >= 3 and token not in STOPWORDS and token.isalnum()) or token.isdigit():
                         # lemmatize according to the token's first tag
-                        lemma = lemmatizer.lemmatize(token, tm[tag[0]])
+                        term = lemmatizer.lemmatize(token, tm[tag[0]])
 
-                        # initializing fields for lemma in words dict
-                        if lemma not in tf[id]:
-                            words[lemma][id] = dict()
-                            words[lemma][id]["metadata"] = False
-                            words[lemma][id]["title"] = False
-                            words[lemma][id]["bolded"] = False
-                            words[lemma][id]["h1"] = False
-                            words[lemma][id]["h2"] = False
-                            words[lemma][id]["h3"] = False
+                        # initializing fields for term in words dict
+                        if term not in tf[id]:
+                            words[term][id] = dict()
+                            words[term][id]["metadata"] = False
+                            words[term][id]["title"] = False
+                            words[term][id]["bolded"] = False
+                            words[term][id]["h1"] = False
+                            words[term][id]["h2"] = False
+                            words[term][id]["h3"] = False
 
                         # finding term frequency for each doc (how many times it appears in this document)
-                        tf[id][lemma] += 1
+                        tf[id][term] += 1
 
-                        # finding document frequency (how many documents the lemma appears in)
-                        if lemma not in s:
-                            df[lemma] += 1
-                            s.add(lemma)
+                        # finding document frequency (how many documents the term appears in)
+                        if term not in s:
+                            df[term] += 1
+                            s.add(term)
 
                 # for calculating df (total number of valid documents)
                 num_docs += 1
@@ -130,14 +126,15 @@ def index_constructor():
     print("finished parsing")
 
     for id in tf:
-        for lemma in tf[id]:
-            words[lemma][id]["tfidf"] = (1 + math.log(tf[id][lemma], 10)) * math.log(num_docs/df[lemma])
+        for term in tf[id]:
+            idfs[term] = math.log(num_docs/df[term], 10)
+            words[term][id]["tfidf"] = (1 + math.log(tf[id][term], 10)) * idfs[term]
 
     
     try:
         # ! https://pymongo.readthedocs.io/en/stable/examples/bulk.html
-        db.test.bulk_write([InsertOne({"_id": term, "docId": words[term]}) for term in words])
-        # db.example.bulk_write([InsertOne({"_id": word, "urls": unique_words[word]}) for word in unique_words])
+        db.words.bulk_write([InsertOne({"_id": term, "idf": idfs[term], "docId": words[term]}) for term in words])
+        # db.example.bulk_write([InsertOne({"_id": term, "urls": unique_words[term]}) for term in unique_words])
     except BulkWriteError as bwe:
         print(bwe.details)
     
@@ -150,7 +147,9 @@ def process_text(text, tag):
     tokens = word_tokenize(text)
     for token in tokens:
         if (len(token) >= 3 and token not in STOPWORDS and token.isalnum()) or token.isdigit():
-            lemma = lemmatizer.lemmatize(token)
+            term = lemmatizer.lemmatize(token)
 
-            if lemma in tf[id]:
-                words[lemma][id][tag] = True
+            if term in tf[id]:
+                words[term][id][tag] = True
+
+index_constructor()
