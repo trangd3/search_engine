@@ -88,38 +88,74 @@ def index_constructor():
                 if metadata:
                     try:
                         metadata = metadata["content"]
-                        process_text(metadata, "metadata")
+                        tokens = word_tokenize(metadata)
+                        for token in tokens:
+                            if (len(token) >= 3 and token not in STOPWORDS and token.isalnum()) or token.isdigit():
+                                term = lemmatizer.lemmatize(token)
+
+                                if term in tf[id]:
+                                    words[term][id]["metadata"] = True
                     except KeyError:
                         pass
 
                 # title
                 if soup.title:
                     title = soup.title.get_text().encode("ascii", "replace").decode().lower()
-                    process_text(title, "title")
+                    tokens = word_tokenize(title)
+                    for token in tokens:
+                        if (len(token) >= 3 and token not in STOPWORDS and token.isalnum()) or token.isdigit():
+                            term = lemmatizer.lemmatize(token)
+
+                            if term in tf[id]:
+                                words[term][id]["title"] = True
 
                 # bold
                 bolded = soup.find("b")
                 if bolded:
                     bolded = bolded.get_text().encode("ascii", "replace").decode().lower()
-                    process_text(bolded, "bolded")
+                    tokens = word_tokenize(bolded)
+                    for token in tokens:
+                        if (len(token) >= 3 and token not in STOPWORDS and token.isalnum()) or token.isdigit():
+                            term = lemmatizer.lemmatize(token)
+
+                            if term in tf[id]:
+                                words[term][id]["bolded"] = True
 
                 # h1
                 h1 = soup.find("h1")
                 if h1:
                     h1 = h1.get_text().encode("ascii", "replace").decode().lower()
-                    process_text(h1, "h1")
+                    tokens = word_tokenize(h1)
+                    for token in tokens:
+                        if (len(token) >= 3 and token not in STOPWORDS and token.isalnum()) or token.isdigit():
+                            term = lemmatizer.lemmatize(token)
+
+                            if term in tf[id]:
+                                words[term][id]["h1"] = True
 
                 # h2
                 h2 = soup.find("h2")
                 if h2:
                     h2 = h2.get_text().encode("ascii", "replace").decode().lower()
-                    process_text(h2, "h2")
+                    tokens = word_tokenize(h2)
+                    for token in tokens:
+                        if (len(token) >= 3 and token not in STOPWORDS and token.isalnum()) or token.isdigit():
+                            term = lemmatizer.lemmatize(token)
+
+                            if term in tf[id]:
+                                words[term][id]["h2"] = True
 
                 # h3
                 h3 = soup.find("h3")
                 if h3:
                     h3 = h3.get_text().encode("ascii", "replace").decode().lower()
-                    process_text(h3, "h3")
+                    tokens = word_tokenize(h3)
+                    for token in tokens:
+                        if (len(token) >= 3 and token not in STOPWORDS and token.isalnum()) or token.isdigit():
+                            term = lemmatizer.lemmatize(token)
+
+                            if term in tf[id]:
+                                words[term][id]["h3"] = True
 
                 
     
@@ -142,14 +178,14 @@ def index_constructor():
 
     return 0
 
-def process_text(text, tag):
-    lemmatizer = WordNetLemmatizer()
-    tokens = word_tokenize(text)
-    for token in tokens:
-        if (len(token) >= 3 and token not in STOPWORDS and token.isalnum()) or token.isdigit():
-            term = lemmatizer.lemmatize(token)
+# def process_text(text, tag):
+#     lemmatizer = WordNetLemmatizer()
+#     tokens = word_tokenize(text)
+#     for token in tokens:
+#         if (len(token) >= 3 and token not in STOPWORDS and token.isalnum()) or token.isdigit():
+#             term = lemmatizer.lemmatize(token)
 
-            if term in tf[id]:
-                words[term][id][tag] = True
+#             if term in tf[id]:
+#                 words[term][id][tag] = True
 
 index_constructor()
