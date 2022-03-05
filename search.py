@@ -45,34 +45,41 @@ class SearchEngine:
         return query_norms
 
 
+    '''
+    calculates doc norms for each doc
+    then calculates their doc scores
+    '''
     def calculate_doc_scores(self, query, query_norms):
-        # calculations for documents
         documents = set()
         doc_scores = defaultdict(float)
 
+        # adds all documents that include any term in the query
         for word in query:
             for docId in self.words[word]["docId"]:
                 documents.add(docId)
 
+        # calculates the doc scores for each doc
         for doc in documents:
             doc_norms = []
             sum = 0
+            
+            # calculates the doc length
             for word in query:
                 # if self.words[word]["docId"][doc]:
                 try:
                     sum += math.pow(self.words[word]["docId"][doc]["tfidf"], 2)
                 except KeyError:
                     pass
-
             doc_length = math.sqrt(sum)
 
+            # incorporates weights for html tags
             for word in query:
                 # if self.words[word]["docId"][doc]:
                 try:
                     multiplier = 1
-                    if self.words[word]["docId"][doc]["title"]:
-                        multiplier += 0.3
                     if self.words[word]["docId"][doc]["metadata"]:
+                        multiplier += 0.3
+                    if self.words[word]["docId"][doc]["title"]:
                         multiplier += 0.25
                     if self.words[word]["docId"][doc]["h1"]:
                         multiplier += 0.2
@@ -87,6 +94,7 @@ class SearchEngine:
                     doc_norms.append(norm)
                 # else:
                 except KeyError:
+                    # appends 0 if word is not in document
                     doc_norms.append(0)
 
             doc_scores[doc] = float(np.dot(query_norms, doc_norms))
@@ -116,13 +124,11 @@ class SearchEngine:
                 self.words[word] = self.collection.find_one(word)
                 # only check for words that return something from the database
                 if self.words[word]:
-                    if word == "k":
-                        print(self.words[word])
                     modified_query.append(word)
 
+            # if there are no documents that include any term in the search input
             if len(modified_query) == 0: 
                 print("Results not found\n")
-
             else:
                 query_norms = self.calculate_query_norm(modified_query)
                 doc_scores = self.calculate_doc_scores(modified_query, query_norms)
